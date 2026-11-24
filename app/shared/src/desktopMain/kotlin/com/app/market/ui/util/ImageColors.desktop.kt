@@ -7,7 +7,9 @@ import coil3.toBitmap
 internal actual fun ImageRequest.Builder.allowColorSampling(): ImageRequest.Builder = this
 
 internal actual fun sampleImagePixels(image: Image, size: Int): IntArray = runCatching {
-    val bitmap = image.toBitmap(image.width, image.height)
+    // Keep color extraction bounded: the previous full-size conversion created a large
+    // temporary bitmap before sampling only a 24 x 24 grid.
+    val bitmap = image.toBitmap(size, size)
     IntArray(size * size) { index ->
         val sampleX = index % size
         val sampleY = index / size

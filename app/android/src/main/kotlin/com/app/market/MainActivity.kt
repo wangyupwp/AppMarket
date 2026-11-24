@@ -15,12 +15,18 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.core.net.toUri
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.app.market.domain.repository.ThemePreferencesRepository
+import com.app.market.domain.model.preference.UiTheme
+import com.app.market.domain.model.preference.ThemeMode
 import com.app.market.domain.repository.UpdatePreferencesRepository
 import com.app.market.platform.AndroidPermissionCoordinator
+import com.app.market.ui.navigation.NavigationCheckpoint
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.withContext
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
@@ -50,8 +56,21 @@ class MainActivity : ComponentActivity(), KoinComponent {
         consumeExternalIntent(intent)
         permissions.registerInstalledApps(installedAppsPermissionLauncher)
         permissions.registerNotifications(postNotificationsPermissionLauncher)
+        val checkpoint = (application as MarketApplication).memoryCheckpoint
+        val restoreFromCheckpoint = intent?.action == Intent.ACTION_MAIN
         setContent {
-            val darkMode = isSystemInDarkTheme()
+            val recovery by produceState<NavigationRecovery?>(null) {
+                val saved = withContext(Dispatchers.IO) { runCatching { checkpoint.take() }.getOrNull() }
+                value = NavigationRecovery(saved.takeIf { restoreFromCheckpoint })
+            }
+            val uiTheme by themePreferences.uiTheme.collectAsState()
+            val materialAppearance by themePreferences.materialAppearance.collectAsState()
+            val systemDarkMode = isSystemInDarkTheme()
+            val darkMode = if (uiTheme == UiTheme.MATERIAL3) when (materialAppearance.mode) {
+                ThemeMode.SYSTEM -> systemDarkMode
+                ThemeMode.LIGHT -> false
+                ThemeMode.DARK -> true
+            } else systemDarkMode
             DisposableEffect(darkMode) {
                 enableEdgeToEdge(
                     statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { darkMode },
@@ -68,7 +87,8 @@ class MainActivity : ComponentActivity(), KoinComponent {
             val downloadsRequest by externalDownloadsRequest.collectAsState()
             val preferencesReady by updatePreferences.initialized.collectAsState()
             val themePreferencesReady by themePreferences.initialized.collectAsState()
-            if (preferencesReady && themePreferencesReady) {
+            val readyRecovery = recovery
+            if (preferencesReady && themePreferencesReady && readyRecovery != null) {
                 App(
                     externalDetailPackageName = detailRequest?.packageName,
                     externalDetailQuery = detailRequest?.encodedQuery,
@@ -85,11 +105,15 @@ class MainActivity : ComponentActivity(), KoinComponent {
                     },
                     externalOpenDownloads = downloadsRequest,
                     onExternalDownloadsConsumed = { externalDownloadsRequest.value = false },
+                    restoredNavigation = readyRecovery.checkpoint,
+                    onNavigationChanged = { checkpoint.currentNavigation = it },
                 )
                 SideEffect { contentReady = true }
             }
         }
     }
+
+    private data class NavigationRecovery(val checkpoint: NavigationCheckpoint?)
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)

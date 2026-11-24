@@ -30,6 +30,8 @@ kotlin {
             kotlin.srcDir(generatedSrcDir.map { it.dir("kotlin") })
         }
         commonMain.dependencies {
+            implementation(libs.compose.material3)
+            implementation(libs.material.color.utilities)
             implementation(projects.domain)
             api(libs.miuix.ui)
             implementation(libs.miuix.blur)
@@ -63,6 +65,7 @@ kotlin {
         }
 
         getByName("desktopTest").dependencies {
+            implementation(libs.compose.ui.test)
             implementation(kotlin("test"))
             implementation(libs.kotlinx.coroutines.test)
         }

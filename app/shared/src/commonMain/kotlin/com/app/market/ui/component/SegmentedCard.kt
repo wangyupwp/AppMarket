@@ -32,8 +32,10 @@ fun CardSegmentContainer(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = CardDefaults.defaultColors()
-    val topCorner = if (isFirst) CardDefaults.CornerRadius else 0.dp
-    val bottomCorner = if (isLast) CardDefaults.CornerRadius else 0.dp
+    val segmented = useMaterial3()
+    val innerCorner = if (segmented) 4.dp else 0.dp
+    val topCorner = if (isFirst) CardDefaults.CornerRadius else innerCorner
+    val bottomCorner = if (isLast) CardDefaults.CornerRadius else innerCorner
     val surfaceModifier = if (topCorner == 0.dp && bottomCorner == 0.dp) {
         Modifier.background(colors.color)
     } else {
@@ -44,6 +46,7 @@ fun CardSegmentContainer(
             modifier = modifier
                 .fillMaxWidth()
                 .padding(horizontal = horizontalPadding)
+                .padding(bottom = if (segmented && !isLast) 2.dp else 0.dp)
                 .then(surfaceModifier),
             content = content,
         )

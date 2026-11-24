@@ -5,6 +5,12 @@ import com.app.market.data.local.PreferenceChanges
 import com.app.market.data.local.PreferencesDataSource
 import com.app.market.data.local.StringPreferenceKey
 import com.app.market.data.local.preferences.HistoryPreferenceKeys
+import com.app.market.data.local.preferences.ThemePreferenceKeys
+import com.app.market.domain.model.preference.UiTheme
+import com.app.market.domain.model.preference.MaterialAppearance
+import com.app.market.domain.model.preference.ThemeMode
+import com.app.market.domain.model.preference.MaterialPalette
+import com.app.market.domain.model.preference.MaterialColorSpec
 import com.app.market.data.local.preferences.UpdatePreferenceKeys
 import com.app.market.data.platform.ThemePlatformPreferences
 import com.app.market.domain.model.market.AppSource
@@ -30,6 +36,59 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class StoreMigrationTest {
+
+    @Test
+    fun materialCustomizationRestoresAndFallsBackFromInvalidValues() = runTest {
+        val store = ControlledPreferencesDataSource(eagerDefaults = true)
+        val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+        try {
+            val prefs = ThemePreferencesRepositoryImpl(store, scope, RecordingThemePlatformPreferences())
+            advanceUntilIdle()
+            val custom = MaterialAppearance(ThemeMode.DARK, MaterialPalette.EXPRESSIVE, MaterialColorSpec.EXPRESSIVE_2025, false)
+            prefs.setMaterialAppearance(custom)
+            prefs.setEnableBlur(true)
+            prefs.setEnableFloatingBottomBar(true)
+            advanceUntilIdle()
+            val restored = ThemePreferencesRepositoryImpl(store, scope, RecordingThemePlatformPreferences())
+            advanceUntilIdle()
+            assertEquals(custom, restored.materialAppearance.value)
+            assertTrue(restored.enableBlur.value)
+            assertTrue(restored.enableFloatingBottomBar.value)
+            prefs.setMaterialAppearance(custom.copy(palette = MaterialPalette.MONOCHROME))
+            advanceUntilIdle()
+            assertEquals(MaterialColorSpec.STANDARD_2021, restored.materialAppearance.value.colorSpec)
+            store.emit(ThemePreferenceKeys.MaterialAppearance, "unrecognized-settings")
+            advanceUntilIdle()
+            assertEquals(MaterialAppearance(), restored.materialAppearance.value)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun themeStyleDefaultsToMiuixAndRestoresSelection() = runTest {
+        val store = ControlledPreferencesDataSource(eagerDefaults = true)
+        val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+        try {
+            val prefs = ThemePreferencesRepositoryImpl(store, scope, RecordingThemePlatformPreferences())
+            advanceUntilIdle()
+            assertEquals(UiTheme.MIUIX, prefs.uiTheme.value)
+            prefs.setUiTheme(UiTheme.MATERIAL3)
+            advanceUntilIdle()
+            val restored = ThemePreferencesRepositoryImpl(store, scope, RecordingThemePlatformPreferences())
+            advanceUntilIdle()
+            assertTrue(restored.initialized.value)
+            assertEquals(UiTheme.MATERIAL3, restored.uiTheme.value)
+            restored.setUiTheme(UiTheme.MIUIX)
+            advanceUntilIdle()
+            assertEquals(UiTheme.MIUIX, prefs.uiTheme.value)
+            store.emit(ThemePreferenceKeys.UiTheme, "unknown-future-theme")
+            advanceUntilIdle()
+            assertEquals(UiTheme.MIUIX, restored.uiTheme.value)
+        } finally {
+            scope.cancel()
+        }
+    }
 
     @Test
     fun themePrefsRestoreNavRailExpansion() = runTest {

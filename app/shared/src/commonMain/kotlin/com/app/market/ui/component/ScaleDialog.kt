@@ -20,8 +20,7 @@ import com.app.market.resources.theme_page_scale_range
 import org.jetbrains.compose.resources.stringResource
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.overlay.OverlayDialog
+import com.app.market.ui.component.TextField
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -31,7 +30,7 @@ fun ScaleDialog(
     scaleProvider: () -> Float,
     onScaleChange: (Float) -> Unit,
 ) {
-    OverlayDialog(
+    WindowDialog(
         show = show,
         title = stringResource(Res.string.theme_page_scale),
         summary = stringResource(Res.string.theme_page_scale_range),

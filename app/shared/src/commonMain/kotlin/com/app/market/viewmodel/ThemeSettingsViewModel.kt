@@ -1,5 +1,7 @@
 package com.app.market.viewmodel
 
+import com.app.market.domain.model.preference.UiTheme
+import com.app.market.domain.model.preference.MaterialAppearance
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -12,6 +14,8 @@ import kotlinx.coroutines.launch
 
 @Immutable
 data class ThemeSettingsUiState(
+    val materialAppearance: MaterialAppearance = MaterialAppearance(),
+    val uiTheme: UiTheme = UiTheme.MIUIX,
     val enableBlur: Boolean = false,
     val enableFloatingBottomBar: Boolean = false,
     val enableFloatingBottomBarBlur: Boolean = false,
@@ -23,11 +27,11 @@ data class ThemeSettingsUiState(
 class ThemeSettingsViewModel(
     private val preferences: ThemePreferencesRepository,
 ) : ViewModel() {
-    private val appearance = combine(preferences.enableBlur, preferences.enableFloatingBottomBar) { blur, floating ->
-        blur to floating
+    private val appearance = combine(preferences.enableBlur, preferences.enableFloatingBottomBar, preferences.uiTheme) { blur, floating, theme ->
+        Triple(blur, floating, theme)
     }
 
-    val uiState: StateFlow<ThemeSettingsUiState> = combine(
+    private val baseState = combine(
         appearance,
         preferences.enableFloatingBottomBarBlur,
         preferences.enableNavigationBadge,
@@ -35,6 +39,7 @@ class ThemeSettingsViewModel(
         preferences.pageScale,
     ) { appearance, glass, badge, predictiveBack, scale ->
         ThemeSettingsUiState(
+            uiTheme = appearance.third,
             enableBlur = appearance.first,
             enableFloatingBottomBar = appearance.second,
             enableFloatingBottomBarBlur = glass,
@@ -42,7 +47,15 @@ class ThemeSettingsViewModel(
             enablePredictiveBack = predictiveBack,
             pageScale = scale,
         )
+    }
+
+    val uiState: StateFlow<ThemeSettingsUiState> = combine(baseState, preferences.materialAppearance) { state, material ->
+        state.copy(materialAppearance = material)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, ThemeSettingsUiState())
+
+    fun setMaterialAppearance(value: MaterialAppearance) = persist { preferences.setMaterialAppearance(value) }
+
+    fun setUiTheme(value: UiTheme) = persist { preferences.setUiTheme(value) }
 
     fun setEnableBlur(value: Boolean) = persist { preferences.setEnableBlur(value) }
     fun setEnableFloatingBottomBar(value: Boolean) = persist { preferences.setEnableFloatingBottomBar(value) }

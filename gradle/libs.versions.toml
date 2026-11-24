@@ -10,6 +10,7 @@ androidx-splashscreen = "1.2.0"
 coil = "3.6.1"
 compose-media-player = "0.11.4"
 compose-multiplatform = "1.12.0"
+compose-material3 = "1.9.0"
 kotlinx-collections-immutable = "0.5.2"
 kotlinx-coroutines = "1.11.0"
 kotlinx-datetime = "0.8.0"
@@ -22,6 +23,9 @@ rikka-shizuku = "13.1.5"
 focus-api = "1.4"
 
 [libraries]
+material-color-utilities = { module = "com.materialkolor:material-color-utilities", version = "5.0.0" }
+compose-ui-test = { module = "org.jetbrains.compose.ui:ui-test", version.ref = "compose-multiplatform" }
+compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "compose-material3" }
 androidx-activity = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidx-core" }
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "androidx-datastore" }

@@ -54,12 +54,12 @@ import com.app.market.ui.util.formatTimeHm
 import com.app.market.viewmodel.SavedPackagesViewModel
 import org.jetbrains.compose.resources.stringResource
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
+import com.app.market.ui.component.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
-import top.yukonga.miuix.kmp.window.WindowDialog
+import com.app.market.ui.component.WindowDialog
 
 @Composable
 fun SavedPackagesScreen(

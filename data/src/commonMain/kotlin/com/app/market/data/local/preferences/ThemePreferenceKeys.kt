@@ -5,6 +5,8 @@ import com.app.market.data.local.StringPreferenceKey
 
 object ThemePreferenceKeys {
     private const val NS = "theme_preferences"
+    val UiTheme = StringPreferenceKey(NS, "ui_theme")
+    val MaterialAppearance = StringPreferenceKey(NS, "material_appearance")
     val EnableBlur = BooleanPreferenceKey(NS, "enable_blur")
     val EnableFloatingBottomBar = BooleanPreferenceKey(NS, "enable_floating_bottom_bar")
     val EnableFloatingBottomBarBlur = BooleanPreferenceKey(NS, "enable_floating_bottom_bar_blur")

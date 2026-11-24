@@ -5,6 +5,8 @@ import com.app.market.data.local.preferences.ThemePreferenceKeys
 import com.app.market.data.platform.ThemePlatformPreferences
 import com.app.market.data.platform.debugLog
 import com.app.market.domain.repository.ThemePreferencesRepository
+import com.app.market.domain.model.preference.UiTheme
+import com.app.market.domain.model.preference.MaterialAppearance
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -19,6 +21,13 @@ internal class ThemePreferencesRepositoryImpl(
     private val scope: CoroutineScope,
     private val platformPreferences: ThemePlatformPreferences,
 ) : ThemePreferencesRepository {
+    private val _materialAppearance = MutableStateFlow(MaterialAppearance())
+    override val materialAppearance: StateFlow<MaterialAppearance> = _materialAppearance.asStateFlow()
+    override suspend fun setMaterialAppearance(value: MaterialAppearance) =
+        preferences.put(ThemePreferenceKeys.MaterialAppearance, value.normalized().encode())
+    private val _uiTheme = MutableStateFlow(UiTheme.MIUIX)
+    override val uiTheme: StateFlow<UiTheme> = _uiTheme.asStateFlow()
+    override suspend fun setUiTheme(value: UiTheme) = preferences.put(ThemePreferenceKeys.UiTheme, value.token)
     private val _initialized = MutableStateFlow(false)
     override val initialized: StateFlow<Boolean> = _initialized.asStateFlow()
     private val _enableBlur = MutableStateFlow(ThemePreferenceKeys.EnableBlur.default)
@@ -38,6 +47,10 @@ internal class ThemePreferencesRepositoryImpl(
 
     init {
         val arrivals = listOf(
+            observe("materialAppearance", preferences.observe(ThemePreferenceKeys.MaterialAppearance)) {
+                _materialAppearance.value = MaterialAppearance.decode(it)
+            },
+            observe("uiTheme", preferences.observe(ThemePreferenceKeys.UiTheme)) { _uiTheme.value = UiTheme.fromToken(it) },
             observe("enableBlur", preferences.observe(ThemePreferenceKeys.EnableBlur)) { _enableBlur.value = it },
             observe("enableFloatingBottomBar", preferences.observe(ThemePreferenceKeys.EnableFloatingBottomBar)) {
                 _enableFloatingBottomBar.value = it

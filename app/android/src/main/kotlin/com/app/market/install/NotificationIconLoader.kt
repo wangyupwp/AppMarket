@@ -22,6 +22,8 @@ internal class NotificationIconLoader(private val context: Context) {
         override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
     }
 
+    fun clearMemoryCache() = cache.evictAll()
+
     fun installedIcon(packageName: String): Bitmap? {
         val key = "pkg:$packageName"
         cache.get(key)?.let { return it }

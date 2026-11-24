@@ -14,6 +14,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.app.market.domain.model.market.AppSource
 import com.app.market.domain.model.preference.HomePage
+import com.app.market.domain.model.preference.UiTheme
+import com.app.market.resources.theme_style
+import com.app.market.resources.theme_style_summary
+import com.app.market.resources.theme_style_miuix
+import com.app.market.resources.theme_style_material3
 import com.app.market.resources.Res
 import com.app.market.resources.about
 import com.app.market.resources.about_summary
@@ -78,10 +83,10 @@ import com.app.market.ui.util.appSourceLabel
 import com.app.market.viewmodel.InstallerSettingsViewModel
 import com.app.market.viewmodel.UpdatesViewModel
 import org.jetbrains.compose.resources.stringResource
-import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.preference.SwitchPreference
-import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
+import com.app.market.ui.component.Card
+import com.app.market.ui.component.ArrowPreference
+import com.app.market.ui.component.SwitchPreference
+import com.app.market.ui.component.WindowDropdownPreference
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
@@ -89,6 +94,8 @@ import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 fun SettingsTab(
     updatesViewModel: UpdatesViewModel,
     installerSettingsViewModel: InstallerSettingsViewModel,
+    uiTheme: UiTheme,
+    onUiThemeChange: (UiTheme) -> Unit,
     bottomPadding: Dp,
     appManagementSupported: Boolean = true,
     onNavigateDeviceProfile: () -> Unit,
@@ -134,6 +141,21 @@ fun SettingsTab(
                 val updateSourceOptions = AppSource.entries.filter { it.capabilities.supportsUpdates }
                 val todaySourceOptions = AppSource.entries.filter { it.capabilities.supportsTodayFeed }
                 Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                    WindowDropdownPreference(
+                        title = stringResource(Res.string.theme_style),
+                        summary = stringResource(Res.string.theme_style_summary),
+                        items = listOf(
+                            stringResource(Res.string.theme_style_miuix),
+                            stringResource(Res.string.theme_style_material3),
+                        ),
+                        selectedIndex = UiTheme.entries.indexOf(uiTheme),
+                        onSelectedIndexChange = { onUiThemeChange(UiTheme.entries[it]) },
+                    )
+                    ArrowPreference(
+                        title = stringResource(Res.string.theme),
+                        summary = stringResource(Res.string.theme_summary),
+                        onClick = onNavigateTheme,
+                    )
                     WindowDropdownPreference(
                         title = stringResource(Res.string.today_source),
                         summary = stringResource(Res.string.today_source_summary),
@@ -334,11 +356,6 @@ fun SettingsTab(
                         title = stringResource(Res.string.device_profile),
                         summary = stringResource(Res.string.device_profile_summary),
                         onClick = onNavigateDeviceProfile,
-                    )
-                    ArrowPreference(
-                        title = stringResource(Res.string.theme),
-                        summary = stringResource(Res.string.theme_summary),
-                        onClick = onNavigateTheme,
                     )
                     ArrowPreference(
                         title = stringResource(Res.string.about),

@@ -6,6 +6,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalUriHandler
@@ -53,10 +54,29 @@ fun AppNavigation(
     onExternalSearchConsumed: (String) -> Unit = {},
     externalOpenDownloads: Boolean = false,
     onExternalDownloadsConsumed: () -> Unit = {},
+    restoredNavigation: NavigationCheckpoint? = null,
+    onNavigationChanged: ((NavigationCheckpoint) -> Unit)? = null,
 ) {
     val backStack = rememberNavBackStack<Route>(Route.Main)
-    val navigator = remember { Navigator(backStack) }
+    val navigator = remember {
+        // A KILL checkpoint can be newer than the task state Android last saved.
+        restoredNavigation?.let {
+            backStack.clear()
+            backStack.addAll(it.routes)
+        }
+        Navigator(backStack)
+    }
     var pendingSearchKeyword by remember { mutableStateOf<String?>(null) }
+    var mainTab by remember { mutableStateOf(restoredNavigation?.mainTab) }
+
+    if (onNavigationChanged != null) {
+        LaunchedEffect(backStack, onNavigationChanged) {
+            snapshotFlow {
+                val routes = backStack.toList().filterIsInstance<Route>()
+                NavigationCheckpoint(listOf(Route.Main) + routes.drop(1).takeLast(24), mainTab)
+            }.collect(onNavigationChanged)
+        }
+    }
 
     val updatesViewModel = koinViewModel<UpdatesViewModel>()
     val searchViewModel = koinViewModel<SearchViewModel>()
@@ -119,6 +139,8 @@ fun AppNavigation(
                     todayViewModel = todayViewModel,
                     pendingSearchKeyword = pendingSearchKeyword,
                     onPendingSearchConsumed = { pendingSearchKeyword = null },
+                    initialTab = mainTab,
+                    onTabChanged = { mainTab = it },
                 )
             }
             entry<Route.AppDetail>(swipeDismiss = swipeBackDirection) { route ->

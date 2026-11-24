@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ApplicationInfo
 import android.os.Build
+import coil3.SingletonImageLoader
 import com.app.market.data.platform.DebugLogging
 import com.app.market.data.platform.ThemePlatformPreferenceContract
 import com.app.market.di.dataModules
@@ -14,8 +15,12 @@ import com.app.market.di.viewModelModule
 import com.app.market.domain.repository.DownloadRepository
 import com.app.market.install.InstallNotificationCoordinator
 import com.app.market.install.InstallPackageChangedReceiver
+import com.app.market.install.NotificationIconLoader
 import com.app.market.install.androidInstallPlatformModule
+import com.app.market.memory.FairMemoryReceiver
+import com.app.market.memory.MemoryCheckpointStore
 import com.app.market.platform.setupImageLoader
+import com.app.market.security.ReleaseSignatureVerifier
 import io.ktor.client.HttpClient
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -24,6 +29,12 @@ import org.koin.dsl.module
 import org.lsposed.hiddenapibypass.HiddenApiBypass
 
 class MarketApplication : Application(), KoinComponent {
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(base)
+        // 在 ContentProvider、依赖注入和后台任务初始化之前进行校验。
+        ReleaseSignatureVerifier.enforce(base)
+    }
+
     companion object {
         private fun setEnableOnBackInvokedCallback(appInfo: ApplicationInfo, enabled: Boolean) {
             runCatching {
@@ -39,8 +50,11 @@ class MarketApplication : Application(), KoinComponent {
 
     private val downloads: DownloadRepository by inject()
     private val notifications: InstallNotificationCoordinator by inject()
+    private val notificationIcons: NotificationIconLoader by inject()
     private val httpClient: HttpClient by inject()
     private val packageChangedReceiver = InstallPackageChangedReceiver()
+    internal lateinit var memoryCheckpoint: MemoryCheckpointStore
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -68,6 +82,14 @@ class MarketApplication : Application(), KoinComponent {
             )
         }
         setupImageLoader(httpClient)
+        memoryCheckpoint = MemoryCheckpointStore(this)
+        FairMemoryReceiver(
+            trimCaches = {
+                SingletonImageLoader.get(this).memoryCache?.clear()
+                notificationIcons.clearMemoryCache()
+            },
+            saveCheckpoint = memoryCheckpoint::save,
+        ).register(this)
         registerPackageChangedReceiver()
         // Eagerly construct the download graph so persisted task and update-history
         // reconciliation also run when the user has not opened a download screen.

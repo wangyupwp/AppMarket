@@ -1,6 +1,8 @@
 # gradle
 !gradle/wrapper/gradle-wrapper.jar
 .gradle/
+.gradle-user-home/
+.tmp/
 build/
 out/
 local.properties

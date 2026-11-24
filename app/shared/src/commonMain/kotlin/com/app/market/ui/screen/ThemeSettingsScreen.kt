@@ -1,5 +1,11 @@
 package com.app.market.ui.screen
 
+import com.app.market.domain.model.preference.UiTheme
+import com.app.market.resources.theme_style
+import com.app.market.resources.theme_style_summary
+import com.app.market.resources.theme_style_miuix
+import com.app.market.resources.theme_style_material3
+import com.app.market.ui.component.WindowDropdownPreference
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -47,8 +53,8 @@ import org.jetbrains.compose.resources.stringResource
 import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.SliderDefaults
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.preference.SwitchPreference
+import com.app.market.ui.component.ArrowPreference
+import com.app.market.ui.component.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
@@ -60,9 +66,14 @@ fun ThemeSettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    if (state.uiTheme == UiTheme.MATERIAL3) {
+        MaterialAppearanceScreen(state, viewModel, onBack, modifier)
+        return
+    }
     ThemeSettingsContent(
         state = state,
         onBack = onBack,
+        onUiTheme = viewModel::setUiTheme,
         onEnableBlur = viewModel::setEnableBlur,
         onEnableFloatingBottomBar = viewModel::setEnableFloatingBottomBar,
         onEnableFloatingBottomBarBlur = viewModel::setEnableFloatingBottomBarBlur,
@@ -79,6 +90,7 @@ fun ThemeSettingsScreen(
 private fun ThemeSettingsContent(
     state: ThemeSettingsUiState,
     onBack: () -> Unit,
+    onUiTheme: (UiTheme) -> Unit,
     onEnableBlur: (Boolean) -> Unit,
     onEnableFloatingBottomBar: (Boolean) -> Unit,
     onEnableFloatingBottomBarBlur: (Boolean) -> Unit,
@@ -89,6 +101,7 @@ private fun ThemeSettingsContent(
     predictiveBackSupported: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val miuix = state.uiTheme == UiTheme.MIUIX
     val layoutDirection = LocalLayoutDirection.current
     var sliderValue by remember(state.pageScale) { mutableFloatStateOf(state.pageScale) }
     var showScaleDialog by rememberSaveable { mutableStateOf(false) }
@@ -112,7 +125,19 @@ private fun ThemeSettingsContent(
                 bottom = innerPadding.calculateBottomPadding() + PageVerticalPadding,
             ),
         ) {
-            if (blurSupported) {
+            item(key = "ui-theme") {
+                CardSegmentContainer(isFirst = true, isLast = true, horizontalPadding = 0.dp,
+                    modifier = Modifier.padding(bottom = PageVerticalPadding)) {
+                    WindowDropdownPreference(
+                        title = stringResource(Res.string.theme_style),
+                        summary = stringResource(Res.string.theme_style_summary),
+                        items = listOf(stringResource(Res.string.theme_style_miuix), stringResource(Res.string.theme_style_material3)),
+                        selectedIndex = UiTheme.entries.indexOf(state.uiTheme),
+                        onSelectedIndexChange = { onUiTheme(UiTheme.entries[it]) },
+                    )
+                }
+            }
+            if (blurSupported && miuix) {
                 item(key = "blur") {
                     CardSegmentContainer(
                         isFirst = true,
@@ -128,7 +153,7 @@ private fun ThemeSettingsContent(
                     }
                 }
             }
-            item(key = "floating-bottom-bar") {
+            if (miuix) item(key = "floating-bottom-bar") {
                 CardSegmentContainer(
                     isFirst = !blurSupported,
                     isLast = false,
@@ -142,7 +167,7 @@ private fun ThemeSettingsContent(
                     )
                 }
             }
-            if (blurSupported) {
+            if (blurSupported && miuix) {
                 item(key = "floating-bottom-bar-glass") {
                     AnimatedVisibility(
                         visible = state.enableFloatingBottomBar,
@@ -166,7 +191,7 @@ private fun ThemeSettingsContent(
             }
             item(key = "navigation-badge") {
                 CardSegmentContainer(
-                    isFirst = false,
+                    isFirst = !miuix,
                     isLast = true,
                     horizontalPadding = 0.dp,
                 ) {
@@ -209,7 +234,13 @@ private fun ThemeSettingsContent(
                         onClick = { showScaleDialog = !showScaleDialog },
                         holdDownState = showScaleDialog,
                         bottomAction = {
-                            Slider(
+                            if (!miuix) androidx.compose.material3.Slider(
+                                value = sliderValue,
+                                onValueChange = { sliderValue = it },
+                                onValueChangeFinished = { onPageScale(sliderValue) },
+                                valueRange = 0.8f..1.1f,
+                                steps = 2,
+                            ) else Slider(
                                 value = sliderValue,
                                 onValueChange = { sliderValue = it },
                                 onValueChangeFinished = { onPageScale(sliderValue) },

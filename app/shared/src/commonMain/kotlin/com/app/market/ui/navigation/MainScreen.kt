@@ -1,5 +1,10 @@
 package com.app.market.ui.navigation
 
+import androidx.compose.material3.NavigationBarItem as MaterialNavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults as MaterialNavigationBarItemDefaults
+import top.yukonga.miuix.kmp.squircle.squircleClip
+import com.app.market.ui.component.blur.defaultBlurEffect
+
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.layout.Box
@@ -23,6 +28,9 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
+import com.app.market.ui.component.useMaterial3
+import com.app.market.ui.component.MaterialSwipeNavigationBar
+import com.app.market.ui.component.clickCursor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
@@ -84,7 +92,7 @@ import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.NavigationRail
 import top.yukonga.miuix.kmp.basic.NavigationRailItem
 import top.yukonga.miuix.kmp.basic.NavigationRailValue
-import top.yukonga.miuix.kmp.basic.Scaffold
+import com.app.market.ui.component.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.rememberNavigationRailState
 import top.yukonga.miuix.kmp.blur.layerBackdrop
@@ -109,9 +117,13 @@ fun MainPage(
     todayViewModel: TodayViewModel,
     pendingSearchKeyword: String? = null,
     onPendingSearchConsumed: () -> Unit = {},
+    initialTab: String? = null,
+    onTabChanged: (String) -> Unit = {},
 ) {
     val uiPlatform = koinInject<UiPlatform>()
     val themePreferences = koinInject<ThemePreferencesRepository>()
+    val uiTheme by themePreferences.uiTheme.collectAsStateWithLifecycle()
+    val themeScope = rememberCoroutineScope()
     val preferencesInitialized by themePreferences.initialized.collectAsStateWithLifecycle()
     val enableFloatingBottomBar = LocalEnableFloatingBottomBar.current
     val enableFloatingBottomBarBlur = LocalEnableFloatingBottomBarBlur.current
@@ -131,12 +143,21 @@ fun MainPage(
 
     // Initial page reads the seeded value once (no launch jump); reactive for the Back target.
     val homePage by updatesViewModel.homePage.collectAsStateWithLifecycle()
+    val restoredPage = tabs.indexOfFirst { it.name == initialTab }.takeIf { it >= 0 }
     val pagerState = rememberPagerState(
-        initialPage = homeIndexOf(updatesViewModel.homePage.value),
+        initialPage = restoredPage ?: homeIndexOf(updatesViewModel.homePage.value),
         pageCount = { tabs.size },
     )
+    LaunchedEffect(pagerState) {
+        if (restoredPage != null && pagerState.currentPage != restoredPage) {
+            pagerState.scrollToPage(restoredPage)
+        }
+    }
     val mainPagerState = rememberMainPagerState(pagerState)
     val selectedPage = mainPagerState.selectedPage
+    LaunchedEffect(selectedPage, tabs) {
+        tabs.getOrNull(selectedPage)?.let { onTabChanged(it.name) }
+    }
     val isWideScreen = rememberIsWideScreen()
     var notificationPermissionRequested by remember { mutableStateOf(false) }
     var searchFocusRequestId by remember { mutableIntStateOf(0) }
@@ -221,6 +242,8 @@ fun MainPage(
                 )
 
                 MainTab.Settings -> SettingsTab(
+                    uiTheme = uiTheme,
+                    onUiThemeChange = { theme -> themeScope.launch { themePreferences.setUiTheme(theme) } },
                     updatesViewModel = updatesViewModel,
                     installerSettingsViewModel = installerSettingsViewModel,
                     bottomPadding = bottomPadding,
@@ -242,7 +265,19 @@ fun MainPage(
     if (isWideScreen) {
         Scaffold(modifier = Modifier.fillMaxSize()) { _ ->
             Row(Modifier.fillMaxSize()) {
-                if (preferencesInitialized) {
+                if (useMaterial3()) {
+                    androidx.compose.material3.NavigationRail {
+                        tabs.forEachIndexed { index, tab ->
+                            androidx.compose.material3.NavigationRailItem(
+                                modifier = Modifier.clickCursor(),
+                                selected = selectedPage == index,
+                                onClick = { onTabClick(index, tab) },
+                                icon = { androidx.compose.material3.Icon(tab.icon, contentDescription = null) },
+                                label = { androidx.compose.material3.Text(stringResource(tab.labelRes)) },
+                            )
+                        }
+                    }
+                } else if (preferencesInitialized) {
                     val railState = rememberNavigationRailState(
                         initialValue = if (themePreferences.navRailExpanded.value) {
                             NavigationRailValue.Expanded
@@ -295,7 +330,39 @@ fun MainPage(
             modifier = Modifier.fillMaxSize(),
             bottomBar = {
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
-                    if (!enableFloatingBottomBar) {
+                    if (useMaterial3()) {
+                        MaterialSwipeNavigationBar(
+                            selectedIndex = selectedPage,
+                            itemCount = tabs.size,
+                            onSelected = { index -> onTabClick(index, tabs[index]) },
+                            modifier = (if (enableFloatingBottomBar) Modifier
+                                .padding(horizontal = 16.dp)
+                                .padding(bottom = 12.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding())
+                                .squircleClip(32.dp) else Modifier)
+                                .then(if (blurBackdrop != null) Modifier.defaultBlurEffect(blurBackdrop) else Modifier),
+                            containerColor = if (blurActive) Color.Transparent else androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainer,
+                            windowInsets = if (enableFloatingBottomBar) WindowInsets(0) else androidx.compose.material3.NavigationBarDefaults.windowInsets,
+                        ) { highlightedIndex ->
+                            tabs.forEachIndexed { index, tab ->
+                                MaterialNavigationBarItem(
+                                    modifier = Modifier.clickCursor(),
+                                    selected = highlightedIndex == index,
+                                    onClick = { onTabClick(index, tab) },
+                                    colors = MaterialNavigationBarItemDefaults.colors(
+                                        indicatorColor = Color.Transparent,
+                                        selectedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.onSecondaryContainer,
+                                    ),
+                                    icon = {
+                                        val badge = navigationBadge(tab, updatesState.updates.size)
+                                        androidx.compose.material3.BadgedBox(badge = { badge?.invoke() }) {
+                                            androidx.compose.material3.Icon(tab.icon, contentDescription = null)
+                                        }
+                                    },
+                                    label = { androidx.compose.material3.Text(stringResource(tab.labelRes)) },
+                                )
+                            }
+                        }
+                    } else if (!enableFloatingBottomBar) {
                         BlurredBar(backdrop = blurBackdrop, blurActive = blurActive) {
                             NavigationBar(color = barColor) {
                                 tabs.forEachIndexed { index, tab ->
@@ -410,7 +477,9 @@ private fun navigationBadge(
 ): (@Composable () -> Unit)? {
     if (!LocalEnableNavigationBadge.current || tab != MainTab.Updates || updateCount <= 0) return null
     return {
-        Badge {
+        if (useMaterial3()) androidx.compose.material3.Badge {
+            androidx.compose.material3.Text(updateCount.toString())
+        } else Badge {
             Text(updateCount.toString())
         }
     }

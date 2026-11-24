@@ -85,7 +85,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
-import coil3.SingletonImageLoader
 import coil3.compose.AsyncImagePainter
 import coil3.compose.LocalPlatformContext
 import coil3.compose.rememberAsyncImagePainter
@@ -166,20 +165,17 @@ import com.app.market.ui.util.topRegionLuminance
 import com.app.market.viewmodel.AppDetailViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.number
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.Card
+import com.app.market.ui.component.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
-import top.yukonga.miuix.kmp.basic.DropdownImpl
+import com.app.market.ui.component.DropdownImpl
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
+import com.app.market.ui.component.IconButton
 import top.yukonga.miuix.kmp.basic.ListPopupColumn
 import top.yukonga.miuix.kmp.basic.PopupPositionProvider
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
@@ -188,8 +184,8 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.More
 import top.yukonga.miuix.kmp.icon.extended.Play
-import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
-import top.yukonga.miuix.kmp.overlay.OverlayListPopup
+import com.app.market.ui.component.OverlayBottomSheet
+import com.app.market.ui.component.OverlayListPopup
 import top.yukonga.miuix.kmp.squircle.squircleBackground
 import top.yukonga.miuix.kmp.squircle.squircleClip
 import top.yukonga.miuix.kmp.squircle.squircleSurface
@@ -198,14 +194,10 @@ import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 import kotlin.math.abs
 import kotlin.math.roundToInt
-import kotlin.time.Duration.Companion.milliseconds
 
 private val PREVIEW_ITEM_HEIGHT = 200.dp
 private val PROMOTION_PREVIEW_WIDTH = 256.dp
 private const val PORTRAIT_SCREENSHOT_RATIO = 5f / 9f
-private const val SCREENSHOT_RATIO_TIMEOUT_MS = 5_000L
-private const val SCREENSHOT_RATIO_SAMPLE_PX = 256
-private const val SCREENSHOT_RATIO_CONCURRENCY = 3
 
 private const val SCREENSHOT_VIEWER_ANIM_MS = 400
 private const val SCREENSHOT_CORNER_DP = 16f
@@ -291,34 +283,9 @@ fun AppDetailScreen(
         state.errorMessage.isNotEmpty() -> DetailPhase.Error
         else -> DetailPhase.Loading
     }
-    // 预取截图真实宽高比；只要比例，故限解码尺寸与并发
-    val platformContext = LocalPlatformContext.current
+    // Ratios are learned only for cards Compose has made visible.  Eagerly decoding every
+    // screenshot just to determine its ratio retained many unnecessary image-cache entries.
     val screenshotRatios = remember(current?.app?.appId) { mutableStateMapOf<String, Float>() }
-    LaunchedEffect(current?.screenshots) {
-        val screenshots = current?.screenshots ?: return@LaunchedEffect
-        val imageLoader = SingletonImageLoader.get(platformContext)
-        val slots = Semaphore(SCREENSHOT_RATIO_CONCURRENCY)
-        for (shot in screenshots) {
-            if (screenshotRatios.containsKey(shot.url)) continue
-            launch {
-                val image = slots.withPermit {
-                    withTimeoutOrNull(SCREENSHOT_RATIO_TIMEOUT_MS.milliseconds) {
-                        imageLoader.execute(
-                            ImageRequest.Builder(platformContext)
-                                .data(shot.url)
-                                .size(SCREENSHOT_RATIO_SAMPLE_PX)
-                                .build()
-                        ).image
-                    }
-                }
-                screenshotRatios[shot.url] = if (image != null && image.width > 0 && image.height > 0) {
-                    image.width.toFloat() / image.height
-                } else {
-                    screenshotAspectRatio(shot.orientation)
-                }
-            }
-        }
-    }
 
     var expandedScreenshot by rememberSaveable(appId) { mutableIntStateOf(-1) }
     val screenshotCardBounds = remember { mutableStateMapOf<String, Rect>() }
@@ -457,6 +424,9 @@ fun AppDetailScreen(
                                 onOpenDetail = onOpenDetail,
                                 onOpenHistory = onOpenHistory,
                                 screenshotRatios = screenshotRatios,
+                                onScreenshotRatioLoaded = { url, ratio ->
+                                    if (ratio > 0f && screenshotRatios[url] != ratio) screenshotRatios[url] = ratio
+                                },
                                 hiddenScreenshot = expandedScreenshot,
                                 onExpandScreenshot = { expandedScreenshot = it },
                                 onScreenshotCardPositioned = { url, bounds ->
@@ -512,6 +482,7 @@ private fun AppDetailContent(
     onOpenDetail: (MarketAppInfo) -> Unit,
     onOpenHistory: (MarketAppInfo) -> Unit,
     screenshotRatios: Map<String, Float>,
+    onScreenshotRatioLoaded: (String, Float) -> Unit,
     hiddenScreenshot: Int,
     onExpandScreenshot: (Int) -> Unit,
     onScreenshotCardPositioned: (String, Rect?) -> Unit,
@@ -591,6 +562,7 @@ private fun AppDetailContent(
                     promotionsTitle = promotionsTitle,
                     screenshotsTitle = previewTitle,
                     screenshotRatios = screenshotRatios,
+                    onScreenshotRatioLoaded = onScreenshotRatioLoaded,
                     hiddenScreenshot = hiddenScreenshot,
                     onExpandScreenshot = onExpandScreenshot,
                     onScreenshotCardPositioned = onScreenshotCardPositioned,
@@ -929,6 +901,7 @@ private fun PreviewAndIntroductionSection(
     promotionsTitle: String,
     screenshotsTitle: String,
     screenshotRatios: Map<String, Float>,
+    onScreenshotRatioLoaded: (String, Float) -> Unit,
     hiddenScreenshot: Int,
     onExpandScreenshot: (Int) -> Unit,
     onScreenshotCardPositioned: (String, Rect?) -> Unit,
@@ -974,9 +947,6 @@ private fun PreviewAndIntroductionSection(
                     text = screenshotsTitle,
                     insideMargin = PaddingValues(horizontal = 28.dp, vertical = 0.dp),
                 )
-                val readyPrefix = current.screenshots
-                    .indexOfFirst { !screenshotRatios.containsKey(it.url) }
-                    .let { if (it < 0) current.screenshots.size else it }
                 LazyRow(
                     modifier = Modifier.height(PREVIEW_ITEM_HEIGHT),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -994,7 +964,7 @@ private fun PreviewAndIntroductionSection(
                         )
                     }
                     itemsIndexed(
-                        current.screenshots.take(readyPrefix),
+                        current.screenshots,
                         key = { _, shot -> shot.url }) { index, shot ->
                         SaveableImageBox(
                             url = shot.expandedUrl,
@@ -1008,7 +978,8 @@ private fun PreviewAndIntroductionSection(
                             }
                             Screenshot(
                                 screenshot = shot,
-                                ratio = screenshotRatios.getValue(shot.url),
+                                ratio = screenshotRatios[shot.url] ?: screenshotAspectRatio(shot.orientation),
+                                onRatioLoaded = { ratio -> onScreenshotRatioLoaded(shot.url, ratio) },
                                 modifier = Modifier
                                     // positionInRoot 不受父容器裁剪影响；boundsInRoot 会把半可见卡片裁成半张
                                     .onGloballyPositioned {
@@ -1632,6 +1603,7 @@ private fun SaveableImageBox(
 private fun Screenshot(
     screenshot: AppScreenshot,
     ratio: Float,
+    onRatioLoaded: (Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     AppAsyncImage(
@@ -1641,6 +1613,11 @@ private fun Screenshot(
         modifier = modifier
             .height(PREVIEW_ITEM_HEIGHT)
             .aspectRatio(ratio),
+        onLoaded = { image ->
+            if (image.width > 0 && image.height > 0) {
+                onRatioLoaded(image.width.toFloat() / image.height)
+            }
+        },
     )
 }
 

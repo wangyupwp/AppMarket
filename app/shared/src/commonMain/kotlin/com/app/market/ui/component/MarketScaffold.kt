@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package com.app.market.ui.component
 
 import androidx.compose.animation.core.Animatable
@@ -23,6 +25,7 @@ import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -62,9 +65,9 @@ import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import top.yukonga.miuix.kmp.anim.folmeSpring
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
+import com.app.market.ui.component.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
-import top.yukonga.miuix.kmp.basic.Scaffold
+import com.app.market.ui.component.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
@@ -89,7 +92,24 @@ fun AdaptiveTopAppBar(
     actions: @Composable RowScope.() -> Unit = {},
     bottomContent: @Composable () -> Unit = {},
 ) {
-    if (rememberIsWideScreen()) {
+    if (useMaterial3()) {
+        // Material 顶栏固定高度，不参与 miuix 的折叠；清除默认无限折叠范围，避免吞掉列表手势。
+        SideEffect {
+            scrollBehavior.state.heightOffsetLimit = 0f
+            scrollBehavior.state.heightOffset = 0f
+        }
+        androidx.compose.foundation.layout.Column {
+            androidx.compose.material3.LargeTopAppBar(
+                title = { androidx.compose.material3.Text(title) },
+                navigationIcon = navigationIcon,
+                actions = actions,
+                expandedHeight = 132.dp,
+                scrollBehavior = LocalMaterialAppBarBehavior.current,
+                colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(containerColor = color),
+            )
+            bottomContent()
+        }
+    } else if (rememberIsWideScreen()) {
         SmallTopAppBar(
             title = title,
             color = color,
@@ -404,6 +424,7 @@ fun MarketScaffold(
     val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
 
     Scaffold(
+        materialLargeTitle = true,
         modifier = modifier,
         topBar = {
             BlurredBar(backdrop = backdrop, blurActive = blurActive) {
@@ -454,6 +475,7 @@ fun MainTabScaffold(
     val barColor = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface
 
     Scaffold(
+        materialLargeTitle = true,
         topBar = {
             BlurredBar(backdrop = backdrop, blurActive = blurActive) {
                 AdaptiveTopAppBar(
@@ -491,10 +513,12 @@ fun HidingMainTabScaffold(
     val useProgressiveBlur = backdrop != null
 
     Scaffold(
+        materialLargeTitle = true,
         modifier = modifier,
         topBar = {
             Box {
-                TopAppBar(
+                if (useMaterial3()) AdaptiveTopAppBar(title, scrollBehavior, actions = actions)
+                else TopAppBar(
                     title = "",
                     largeTitle = title,
                     color = Color.Transparent,
@@ -601,6 +625,12 @@ fun SectionTitle(
     modifier: Modifier = Modifier,
     topPadding: Dp = 20.dp,
 ) {
+    if (useMaterial3()) {
+        androidx.compose.material3.Text(text, modifier.padding(start = 28.dp, top = topPadding, end = 28.dp, bottom = 16.dp),
+            style = androidx.compose.material3.MaterialTheme.typography.titleSmall,
+            color = androidx.compose.material3.MaterialTheme.colorScheme.primary)
+        return
+    }
     SmallTitle(
         text = text,
         modifier = modifier,

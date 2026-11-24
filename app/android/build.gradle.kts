@@ -9,6 +9,7 @@ plugins {
 }
 
 dependencies {
+    testImplementation("junit:junit:4.13.2")
     implementation(projects.app.shared)
     implementation(projects.domain)
     implementation(projects.data)
@@ -27,6 +28,9 @@ dependencies {
 
 android {
     namespace = ProjectConfig.PACKAGE_NAME
+    buildFeatures {
+        buildConfig = true
+    }
     compileSdk {
         version = release(ProjectConfig.Android.COMPILE_SDK) {
             minorApiLevel = ProjectConfig.Android.COMPILE_SDK_MINOR
@@ -39,6 +43,7 @@ android {
         targetSdk = ProjectConfig.Android.TARGET_SDK
         versionCode = resolveVersionCode()
         versionName = ProjectConfig.VERSION_NAME
+        buildConfigField("String", "TRUSTED_CERTIFICATE_SHA256", "\"${ProjectConfig.RELEASE_CERTIFICATE_SHA256}\"")
 
         ndk {
             //noinspection ChromeOsAbiSupport
@@ -52,6 +57,17 @@ android {
     val keystorePwd = properties.getProperty("KEYSTORE_PASS") ?: System.getenv("KEYSTORE_PASS")
     val alias = properties.getProperty("KEY_ALIAS") ?: System.getenv("KEY_ALIAS")
     val pwd = properties.getProperty("KEY_PASSWORD") ?: System.getenv("KEY_PASSWORD")
+    val verifyReleaseCertificate = tasks.register<VerifyReleaseCertificateTask>("verifyReleaseSigningCertificate") {
+        group = "verification"
+        description = "Verify the release keystore certificate against the pinned SHA-256."
+        if (keystorePath != null) keystoreFile.set(file(keystorePath))
+        if (keystorePwd != null) storePassword.set(keystorePwd)
+        if (alias != null) keyAlias.set(alias)
+        trustedSha256.set(ProjectConfig.RELEASE_CERTIFICATE_SHA256)
+    }
+    tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+        dependsOn(verifyReleaseCertificate)
+    }
     if (keystorePath != null) {
         signingConfigs {
             register("github") {
@@ -74,13 +90,17 @@ android {
 
     buildTypes {
         release {
+            isDebuggable = false
+            isJniDebuggable = false
+            buildConfigField("boolean", "ENFORCE_SIGNATURE_CHECK", "true")
             isMinifyEnabled = true
             isShrinkResources = true
             vcsInfo.include = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules-android.pro")
-            signingConfig = signingConfigs.getByName(if (keystorePath != null) "github" else "debug")
+            signingConfig = signingConfigs.getByName(if (keystorePath != null) "github" else "release")
         }
         debug {
+            buildConfigField("boolean", "ENFORCE_SIGNATURE_CHECK", "false")
             if (keystorePath != null) signingConfig = signingConfigs.getByName("github")
         }
     }

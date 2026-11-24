@@ -41,7 +41,7 @@ import com.app.market.ui.component.SectionTitle
 import com.app.market.ui.util.appDisplayName
 import com.app.market.viewmodel.IgnoredAppsViewModel
 import org.jetbrains.compose.resources.stringResource
-import top.yukonga.miuix.kmp.basic.Card
+import com.app.market.ui.component.Card
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical

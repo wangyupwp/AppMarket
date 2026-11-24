@@ -4,6 +4,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
@@ -91,6 +93,30 @@ fun AppButton(
     insideMargin: PaddingValues = ButtonDefaults.InsideMargin,
     content: @Composable RowScope.() -> Unit,
 ) {
+    if (useMaterial3()) {
+        val source = remember { MutableInteractionSource() }
+        androidx.compose.material3.Button(
+            onClick = onClick,
+            modifier = modifier.widthIn(min = minWidth).heightIn(min = minHeight)
+                .clickCursor(enabled).materialPressFeedback(source),
+            enabled = enabled,
+            shape = RoundedCornerShape(cornerRadius),
+            interactionSource = source,
+            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                containerColor = colors.color,
+                contentColor = colors.contentColor,
+                disabledContainerColor = colors.disabledColor,
+                disabledContentColor = colors.disabledContentColor,
+            ),
+            contentPadding = insideMargin,
+            content = {
+                androidx.compose.runtime.CompositionLocalProvider(
+                    top.yukonga.miuix.kmp.theme.LocalContentColor provides androidx.compose.material3.LocalContentColor.current,
+                ) { content() }
+            },
+        )
+        return
+    }
     Button(
         onClick = onClick,
         modifier = modifier,
@@ -116,6 +142,27 @@ fun AppTextButton(
     colors: TextButtonColors = ButtonDefaults.textButtonColors(),
     insideMargin: PaddingValues = ButtonDefaults.InsideMargin,
 ) {
+    if (useMaterial3()) {
+        val source = remember { MutableInteractionSource() }
+        androidx.compose.material3.TextButton(
+            onClick = onClick,
+            modifier = modifier.widthIn(min = minWidth).heightIn(min = minHeight)
+                .clickCursor(enabled).materialPressFeedback(source),
+            enabled = enabled,
+            shape = RoundedCornerShape(cornerRadius),
+            interactionSource = source,
+            contentPadding = insideMargin,
+            colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                containerColor = colors.color,
+                contentColor = colors.textColor,
+                disabledContainerColor = colors.disabledColor,
+                disabledContentColor = colors.disabledTextColor,
+            ),
+        ) {
+            AppButtonText(text, color = androidx.compose.material3.LocalContentColor.current)
+        }
+        return
+    }
     val mappedColors = remember(colors) {
         ButtonColors(
             color = colors.color,
